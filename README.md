@@ -99,7 +99,40 @@ The model was trained in **Databricks Playground** using **PySpark** for distrib
 
 ---
 
-## **6. Output Behavior**
+## **6. Query-Based Learning in Databricks Genie**
+
+To make the system interactive and continuously improving, the model is connected to **Databricks Genie**, allowing users to ask natural-language questions or playlist requests.  
+Each query not only generates a recommendation but also **feeds back information** that helps the model refine its thresholds and improve personalization over time.
+
+### **Example Queries**
+- `Can you give me a playlist for running?`  
+- `Give me a playlist with jazz music that is chill.`  
+- `Give me a playlist with Katy Perry.`  
+- `I want classical music as well.`  
+
+### **How Query Training Works**
+1. **User Query Understanding**  
+   - Genie parses each user question and identifies **intent** (e.g., activity-based, artist-based, mood-based).  
+   - It maps keywords (like “running,” “chill,” “Katy Perry”) to audio feature expectations.  
+     - “Running” → high energy, high tempo  
+     - “Chill” → low energy, high acousticness  
+     - “Jazz” → mid acousticness, low speechiness  
+
+2. **Dynamic Threshold Adjustment**  
+   - When a user’s playlist or behavior (e.g., skipping or replaying songs) is known, Genie updates the **feature thresholds** that define moods for that specific user.  
+   - Over time, the “chill” or “energetic” definitions become personalized — each query slightly **re-trains the feature averages** based on user activity.
+
+3. **Continuous Learning Loop**  
+   - Every new query provides context on what the user values (genre, tempo, mood).  
+   - The model adjusts cluster boundaries and similarity thresholds, leading to more relevant and accurate playlists the next time.
+
+4. **Model Feedback Integration**  
+   - Query results and user engagement metrics (e.g., liked, skipped, saved) are stored in Databricks tables.  
+   - This data serves as a **retraining signal**, improving recommendation logic on subsequent runs.
+
+---
+
+## **7. Output Behavior**
 
 The model outputs structured, human-readable playlists and explanations.
 
@@ -117,7 +150,7 @@ Each result includes:
 
 ---
 
-## **7. Example Prompts**
+## **8. Example Prompts**
 
 Users can interact naturally using questions or prompts such as:
 
@@ -129,17 +162,18 @@ Each response provides contextual explanations and similarity metrics to ensure 
 
 ---
 
-## **8. Summary of Learning Modes**
+## **9. Summary of Learning Modes**
 
 | Scenario | Learning Type | Description |
 |-----------|----------------|-------------|
 | No User Data | **Unsupervised Clustering** | Groups songs into mood clusters based on audio features |
 | With User Data (Playlists Only) | **Semi-Supervised / Similarity-Based** | Matches user’s profile vector to nearest songs in feature space |
+| With User Queries (Genie Feedback) | **Adaptive / Incremental Learning** | Updates thresholds dynamically based on user prompts and preferences |
 | With User Feedback (Likes/Skips) | **Supervised Learning** | Predicts song preference directly from labeled examples |
 
 ---
 
-## **9. Future Improvements**
+## **10. Future Improvements**
 
 - Add **lyrical sentiment analysis** and **genre embeddings** for richer representations.  
 - Implement **reinforcement learning** for continuous preference updates.  
