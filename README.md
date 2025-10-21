@@ -1,124 +1,147 @@
-# **Spotify Feature-Based Model**
+# **Spotify Feature-Based Recommendation Model**
 
-Our model classifies songs based on their audio features (such as energy, acousticness, danceability, and more) to group and recommend music in a smart, data-driven way.
-
----
-
-## **Without User Information**
-
-When no user data is available, recommendations rely on general trends:
-
-- **Artist-based requests** (e.g., “Katy Perry songs”) return the most popular songs by that artist.  
-- **Mood-based requests** (e.g., “Chill playlist”) use a default threshold for “chill” songs (low energy, high acousticness, etc.) and return the top globally popular tracks in that mood category.
+This project builds an intelligent song recommendation system using the **Spotify Tracks dataset**.  
+The model classifies, clusters, and recommends songs based on their **audio features** (e.g., energy, acousticness, valence, tempo, etc.), and can operate in two modes:
+1. **Without user information (unsupervised)**
+2. **With user preferences (personalized / semi-supervised)**
 
 ---
 
-## **With User Information**
+## **1. Overview**
 
-When user preferences are known, recommendations become personalized:
-
-- **Artist-based requests** (e.g., “Katy Perry songs”) return songs by that artist that best match the user’s listening style, mixing about 30% familiar and 70% new tracks.  
-- **Mood-based requests** (e.g., “Chill playlist”) adapt the “chill” thresholds to the user’s own listening patterns, finding songs across Spotify that match their personalized chill profile, again with a mix of known and new discoveries.
+The system learns from the intrinsic properties of songs to create “mood clusters” such as *Chill*, *Party*, *Focus*, and *Sad*.  
+When user data (playlists or listening history) is available, it personalizes these clusters by finding the closest matches to the user’s musical taste.
 
 ---
 
-## **1. Core Model (Common to Both Modes)**
+## **2. Without User Information — Unsupervised Learning**
 
-**Goal:** Classify and group songs using only audio features, not user data.  
+When there’s no user dataset involved, the model operates in **unsupervised mode** using clustering algorithms.
 
-**Pipeline:**
+### **Goal**
+Discover natural groupings (moods) in the Spotify dataset using only song-level audio features.
 
-- **Feature Inputs:**  
-  energy, danceability, valence, acousticness, instrumentalness, tempo, loudness, speechiness, etc.  
+### **Process**
+1. **Feature Extraction**  
+   Extract numerical features such as  
+   `energy`, `danceability`, `valence`, `acousticness`, `instrumentalness`, `tempo`, `speechiness`, and `loudness`.
 
-- **Clustering / Embedding:**  
-  Use K-Means or PCA + UMAP to project songs into a low-dimensional “mood space.”  
+2. **Preprocessing**  
+   - Normalize features using `StandardScaler`.  
+   - Optionally apply **PCA** or **UMAP** for dimensionality reduction and visualization.
 
-- **Labeling:**  
-  Label clusters by dominant characteristics such as “Chill,” “Party,” “Focus,” or “Sad.”  
+3. **Unsupervised Clustering**  
+   Use algorithms such as **K-Means** or **Gaussian Mixture Models (GMM)** to discover mood-based clusters.  
+   Each cluster represents a musical “theme” or “emotion.”
 
-- **Fame / Popularity Metric:**  
-  Rank within clusters by Spotify popularity score.
+4. **Cluster Labeling**  
+   Assign human-readable mood names to clusters based on dominant feature averages:  
+   - High energy, high danceability → *Party*  
+   - Low energy, high acousticness → *Chill*  
+   - Mid valence, moderate tempo → *Focus*  
 
----
-
-## **2. Without User Information (Cold Start Mode)**
-
-**Logic:**  
-When a user asks for a category or artist, recommendations rely on global patterns.
-
-**Example Behaviors:**
-- *“Katy Perry songs”* → returns the most popular songs by her.  
-- *“Chill playlist”* → uses predefined “Chill cluster” thresholds (low energy, high acousticness, mid valence) and outputs globally top songs in that cluster.
-
----
-
-## **3. With User Information (Personalized Mode)**
-
-**Logic:**  
-The personalization layer activates once user playlists or liked tracks are known.
-
-**Steps:**
-
-- **Build user profile vector:**  
-  Calculate the average of the user’s song features (mean energy, mean valence, etc.).  
-
-- **Find nearest neighbors among global songs:**  
-  Use cosine similarity or K-Nearest Neighbors (KNN) within the feature space.  
-
-- **Apply contextual filters:**  
-  - If the query mentions an artist, return songs by that artist closest to the user’s taste vector (e.g., Katy Perry songs similar to the user’s energy/acousticness preferences).  
-  - If the query mentions a mood (“Chill”), adapt the chill thresholds based on the user’s average chill song features.  
-
-- **Diversity rule:**  
-  Mix approximately 30% well-known (high popularity) songs and 70% new or less-known songs that are highly similar to the user’s taste.
+5. **Popularity Ranking**  
+   Rank songs within each cluster using Spotify’s popularity metric.  
+   Example: “Top 10 Chill Songs” or “Top 10 Party Tracks.”
 
 ---
 
-## **4. Training Environment**
+## **3. With User Information — Semi-Supervised Personalization**
 
-The model was trained and tested using **Databricks Playground**, leveraging PySpark for scalable data processing and MLlib for clustering and feature transformation.  
+When user listening data or playlists are available, the system personalizes its recommendations.  
+At this stage, it transitions from pure unsupervised clustering to **semi-supervised, similarity-based learning**.
 
-**Steps:**
-1. Imported the Spotify dataset with song-level audio features.  
-2. Cleaned and standardized the data using Spark ML’s `StandardScaler`.  
-3. Applied dimensionality reduction with PCA and UMAP to create a “mood embedding space.”  
-4. Performed K-Means clustering to group songs by mood type.  
-5. Stored model outputs in Databricks tables for querying and recommendation generation.  
-6. Implemented prompt-based interactions to generate user-facing responses.
+### **Goal**
+Use the user’s listening history to tailor recommendations that reflect their individual preferences.
+
+### **Process**
+1. **User Profile Vector**  
+   - Compute the mean of all audio features from songs in the user’s playlist.  
+   - This creates a single vector representing the user’s “musical fingerprint.”
+
+2. **Similarity Search**  
+   - Compare this user vector against all songs in the database using **Cosine Similarity** or **K-Nearest Neighbors (KNN)**.  
+   - Identify the most similar songs (the “nearest neighbors”).
+
+3. **Context-Aware Recommendation**
+   - **Artist-based queries:**  
+     Recommend songs by the specified artist that are closest to the user’s preferences  
+     (e.g., “Katy Perry songs” → songs by her that align with the user’s energy/acousticness levels).  
+   - **Mood-based queries:**  
+     Adapt the thresholds for that mood based on the user’s previous songs labeled with that mood (e.g., redefine “Chill” based on what the user considers chill).
+
+4. **Diversity Rule**  
+   - To maintain freshness and discovery, output is mixed:  
+     **30% familiar (popular)** songs and **70% new but similar** songs.
 
 ---
 
-## **5. Output Generation and Behavior**
+## **4. Supervised Learning (Optional Future Layer)**
 
-When the model generates a playlist or recommendation, it follows a structured response format:
+If explicit feedback (likes, skips, ratings) becomes available, the system can evolve into a **fully supervised model** that learns user preferences directly.
 
+Example:  
+Train a classifier (Logistic Regression, XGBoost, etc.) using `(song_features → liked/disliked)` pairs to predict preference scores.
+
+---
+
+## **5. Training Environment**
+
+The model was trained in **Databricks Playground** using **PySpark** for distributed data processing and **Spark MLlib** for clustering and feature engineering.
+
+### **Training Steps**
+1. Load and clean the Spotify dataset.  
+2. Standardize all numerical features.  
+3. Apply **PCA** to reduce noise and dimensionality.  
+4. Train the unsupervised clustering model (e.g., K-Means).  
+5. Store cluster assignments and centroids in Databricks tables.  
+6. Build the similarity-based personalization layer for user data.  
+
+---
+
+## **6. Output Behavior**
+
+The model outputs structured, human-readable playlists and explanations.
+
+### **Output Format**
+Each result includes:
 - **Song Name**  
 - **Artist Name**  
-- **Explanation** of why the song is a good fit based on the input description.  
-- **Match Percentage** indicating how closely the song aligns with the user’s input or preference profile.
+- **Explanation**: why the song fits the user’s description or query  
+- **Match Percentage**: how closely the song aligns with the user’s taste or activity context
 
-**Rules:**
-- When a playlist is requested, provide a curated list with names, artists, and explanations.  
-- When asked for songs similar to another track, include similarity reasoning and match percentage.  
-- When only an activity is given (e.g., “while I cook”), the model explains why that playlist fits the described activity.
+### **Rules**
+- For playlist requests: generate a list with 10–15 songs, including explanations and match percentages.  
+- For similarity requests: include reason for similarity and percentage match.  
+- For activity-only prompts: describe why each song fits that activity.
 
 ---
 
-## **6. Example Prompts**
+## **7. Example Prompts**
 
-You can interact with the model using natural language requests like:
+Users can interact naturally using questions or prompts such as:
 
 - `Create a playlist of 15 songs to listen to while I drive and watch the sunset.`  
 - `Give me a playlist with 10 songs while I clean my room.`  
 - `Give me 10 songs that are similar to Katy Perry songs.`  
 
-Each output includes explanations and similarity percentages to make recommendations transparent and user-friendly.
+Each response provides contextual explanations and similarity metrics to ensure transparency and personalization.
 
 ---
 
-## **7. Future Improvements**
+## **8. Summary of Learning Modes**
 
-- Expand the feature set with lyrical sentiment and genre embeddings.  
-- Integrate reinforcement learning to adapt recommendations over time.  
-- Deploy as an interactive web app using Databricks + Streamlit for live demos.
+| Scenario | Learning Type | Description |
+|-----------|----------------|-------------|
+| No User Data | **Unsupervised Clustering** | Groups songs into mood clusters based on audio features |
+| With User Data (Playlists Only) | **Semi-Supervised / Similarity-Based** | Matches user’s profile vector to nearest songs in feature space |
+| With User Feedback (Likes/Skips) | **Supervised Learning** | Predicts song preference directly from labeled examples |
+
+---
+
+## **9. Future Improvements**
+
+- Add **lyrical sentiment analysis** and **genre embeddings** for richer representations.  
+- Implement **reinforcement learning** for continuous preference updates.  
+- Build a **web-based demo** using Streamlit + Databricks for live recommendations.  
+- Integrate Spotify API for real-time playback and playlist creation.
